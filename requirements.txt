@@ -1,0 +1,4 @@
+groq
+pypdf
+streamlit
+streamlit_mic_recorder
