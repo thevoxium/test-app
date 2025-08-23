@@ -1,12 +1,4 @@
 
-# app.py
-# Minimal, single-button voice interview assistant with resume context.
-# Deps:
-#   pip install streamlit groq streamlit-mic-recorder pypdf
-#
-# Env:
-#   export GROQ_API_KEY=your_key
-
 import os
 import io
 from typing import List, Dict, Optional
@@ -14,18 +6,14 @@ from typing import List, Dict, Optional
 import streamlit as st
 from streamlit_mic_recorder import mic_recorder
 from groq import Groq
+import streamlit.components.v1 as components
 
-# -------- Optional PDF extraction (pypdf) --------
 _PDF_OK = True
 try:
     from pypdf import PdfReader
 except Exception:
     _PDF_OK = False
 
-
-# =========================
-# Config
-# =========================
 STT_MODEL = "whisper-large-v3-turbo"
 CHAT_MODEL = "llama-3.3-70b-versatile"
 
@@ -46,16 +34,35 @@ Ground your answers in the candidate's resume context provided to you.
 
 st.set_page_config(page_title="", layout="centered")
 
+import os
+import streamlit as st
+from pathlib import Path
 
-import os, streamlit as st
-if "GROQ_API_KEY" in st.secrets:
-    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+def _load_groq_key():
+    key = os.getenv("GROQ_API_KEY")
+    if key:
+        return key
+    local_paths = [
+        Path.home() / ".streamlit/secrets.toml",
+        Path.cwd() / ".streamlit/secrets.toml",
+    ]
+    if any(p.exists() for p in local_paths):
+        try:
+            return st.secrets.get("GROQ_API_KEY", None)
+        except Exception:
+            return None
+    try:
+        return st.secrets.get("GROQ_API_KEY", None)
+    except Exception:
+        return None
 
+GROQ_API_KEY = _load_groq_key()
 
+if GROQ_API_KEY:
+    os.environ["GROQ_API_KEY"] = GROQ_API_KEY
+else:
+    st.warning("GROQ_API_KEY not found in environment or Streamlit secrets.")
 
-# =========================
-# Caches / State
-# =========================
 @st.cache_resource(show_spinner=False)
 def get_groq_client() -> Groq:
     return Groq()
@@ -64,7 +71,6 @@ client = get_groq_client()
 
 @st.cache_data(show_spinner=False)
 def extract_pdf_text(pdf_bytes: bytes) -> str:
-    """Extract text from a PDF (bytes) using pypdf."""
     if not _PDF_OK:
         return ""
     reader = PdfReader(io.BytesIO(pdf_bytes))
@@ -73,13 +79,11 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
         try:
             parts.append(page.extract_text() or "")
         except Exception:
-            # Skip pages that fail to extract
             continue
     return "\n".join(parts).strip()
 
 def init_state():
     if "history" not in st.session_state:
-        # Store ONLY turns (user/assistant). System & resume are injected at call time.
         st.session_state.history: List[Dict[str, str]] = []
     if "resume_text" not in st.session_state:
         st.session_state.resume_text: str = ""
@@ -90,14 +94,10 @@ def init_state():
     if "_cleared_for_this_round" not in st.session_state:
         st.session_state._cleared_for_this_round = False
     if "qa_pairs" not in st.session_state:
-        st.session_state.qa_pairs = 0  # count of user->assistant exchanges since last reset
+        st.session_state.qa_pairs = 0
 
 init_state()
 
-
-# =========================
-# API Helpers
-# =========================
 def groq_stt_from_wav_bytes(wav_bytes: bytes, language: Optional[str] = None) -> str:
     file_tuple = ("audio.wav", wav_bytes)
     transcription = client.audio.transcriptions.create(
@@ -120,7 +120,6 @@ def build_messages() -> List[Dict[str, str]]:
             "role": "system",
             "content": "Resume context (verbatim; use as factual background):\n" + clamp_text(resume),
         })
-    # include the conversation turns so far (auto-cleared after 10 Q/A)
     msgs.extend(st.session_state.history)
     return msgs
 
@@ -139,31 +138,18 @@ def groq_chat_stream(messages: List[Dict[str, str]], temperature: float = 0.5, t
         if delta and getattr(delta, "content", None):
             yield delta.content
 
-
-# =========================
-# Sidebar (collapsible) — Resume Uploads
-# =========================
 with st.sidebar.expander("📄 Resume uploads (PDF)", expanded=False):
     if not _PDF_OK:
         st.warning("Install pypdf for resume extraction: `pip install pypdf`")
-
     up1 = st.file_uploader("Resume upload 1", type=["pdf"], key="resume1")
-
     combined_resume = []
     if up1 is not None:
         txt1 = extract_pdf_text(up1.getvalue())
         if txt1:
             combined_resume.append("=== Resume 1 ===\n" + txt1)
-
-    # Persist combined resume text (kept across the whole session)
     if combined_resume:
         st.session_state.resume_text = "\n\n".join(combined_resume).strip()
 
-
-# =========================
-# Minimal UI (one button)
-# =========================
-# Two placeholders ONLY: transcript and answer
 transcript_box = st.empty()
 answer_box = st.empty()
 
@@ -182,20 +168,79 @@ rec = mic_recorder(
     key="one_button",
 )
 
-# On start: clear visible output once per round
+components.html(
+    """
+    <script>
+      (function() {
+        if (window.__spaceHandlerAttached) return;
+        window.__spaceHandlerAttached = true;
+
+        const makeFocusable = () => {
+          try {
+            const i = document.createElement('input');
+            i.type = 'text';
+            i.autofocus = true;
+            i.style.position = 'fixed';
+            i.style.opacity = '0';
+            i.style.height = '0';
+            i.style.width = '0';
+            i.style.pointerEvents = 'none';
+            document.body.appendChild(i);
+            setTimeout(() => { try { i.blur(); document.body.focus(); } catch(e) {} }, 50);
+          } catch(e) {}
+        };
+
+        const rootDoc = (function() {
+          try { return window.parent && window.parent.document ? window.parent.document : document; } catch(e) { return document; }
+        })();
+
+        const isTyping = (el) => {
+          if (!el) return false;
+          const tag = el.tagName ? el.tagName.toLowerCase() : "";
+          const editable = el.isContentEditable;
+          return editable || tag === "input" || tag === "textarea" || tag === "select";
+        };
+
+        const findRecorderButton = () => {
+          const labels = ["🎙️ Start recording", "⏹️ Stop recording"];
+          const btns = Array.from(rootDoc.querySelectorAll('button'));
+          for (const b of btns) {
+            const txt = (b.innerText || "").trim();
+            if (labels.some(l => txt.includes(l))) return b;
+          }
+          return null;
+        };
+
+        const handler = function(e) {
+          const key = e.code === "Space" || e.key === " " || e.key === "Spacebar";
+          const typing = isTyping(rootDoc.activeElement) || isTyping(document.activeElement);
+          if (key && !typing) {
+            const btn = findRecorderButton();
+            if (btn) {
+              e.preventDefault();
+              e.stopPropagation();
+              btn.click();
+            }
+          }
+        };
+
+        makeFocusable();
+        try { rootDoc.addEventListener("keydown", handler, true); } catch(e) {}
+        window.addEventListener("keydown", handler, true);
+      })();
+    </script>
+    """,
+    height=0
+)
+
 if rec and isinstance(rec, dict) and rec.get("recording", False):
     if not st.session_state._cleared_for_this_round:
         clear_visible_output()
         st.session_state._cleared_for_this_round = True
 
-# On stop: STT -> stream LLM
 if rec and isinstance(rec, dict) and rec.get("bytes"):
     audio_bytes: bytes = rec["bytes"]
-
-    # Fresh slate for this round
     clear_visible_output()
-
-    # 1) Transcribe current question
     try:
         transcript = groq_stt_from_wav_bytes(audio_bytes, language=None)
         st.session_state.last_transcript = transcript.strip()
@@ -203,10 +248,7 @@ if rec and isinstance(rec, dict) and rec.get("bytes"):
     except Exception as e:
         answer_box.error(f"Transcription error: {e}")
     else:
-        # 2) Add user turn to memory
         st.session_state.history.append({"role": "user", "content": st.session_state.last_transcript})
-
-        # 3) Stream LLM (role-playing candidate) with resume + history context
         full_text = ""
         try:
             messages = build_messages()
@@ -219,12 +261,7 @@ if rec and isinstance(rec, dict) and rec.get("bytes"):
             st.session_state.last_response = full_text.strip()
             st.session_state.history.append({"role": "assistant", "content": st.session_state.last_response})
             st.session_state.qa_pairs += 1
-
-            # 4) Auto-clear conversation history after 10 Q/A (resume remains)
             if st.session_state.qa_pairs >= 10:
                 st.session_state.history = []
                 st.session_state.qa_pairs = 0
-                # Keep the last exchange visible; memory will be fresh on next question.
-
-    # Allow next Start to clear again
     st.session_state._cleared_for_this_round = False
