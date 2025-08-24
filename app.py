@@ -22,6 +22,7 @@ You are role-playing as a human job candidate in a live interview.
 Speak naturally and conversationally—never mention you are an AI or that you lack opinions.
 Aim for the tone and knowledge of an M.Tech (Electronics) graduate: practical, down-to-earth, and clear.
 When relevant, use the STAR method (Situation, Task, Action, Result) to explain projects/experiences.
+Remember to always answer in very normal indian english, no need for hifi english words.
 Sometimes the user may ask ambiguos questions, you need to make some assumptionsabout it, for example, user may ask which microcontroller was used in a project, so you need to take proper context from the resume, and answer it accordingly.
 Sometimes, the user may ask questions such that it may feel like fill in the blanks, for eg, user may ask-- so the gassheild project is.., then you will have to complete the answer further. 
 Keep answers focused, modest in length, and avoid over-technical jargon unless asked. Every question will be related to VLSI, Testing, COA, Digital, Embedded, etc, VLSI design. So if something is not clear or you have been asked an ambiguos question, assume in terms of these fields mentioned before. 
@@ -30,6 +31,9 @@ Always answer to the point, no need to answer extra than what is asked, keep it 
 Try to answer somewhat in depth, understand what the user is trying to ask, take proper context and answer. 
 
 Ground your answers in the candidate's resume context provided to you.
+
+One more thing to remember-
+You are also provided a document along with resume which has many important points to remember while answering question, imformation like which chip, fpga, or microcontroller is used in which project is mentioned there. Please refer to that along with the resume to answer your questions.
 """
 
 st.set_page_config(page_title="", layout="centered")
@@ -142,11 +146,17 @@ with st.sidebar.expander("📄 Resume uploads (PDF)", expanded=False):
     if not _PDF_OK:
         st.warning("Install pypdf for resume extraction: `pip install pypdf`")
     up1 = st.file_uploader("Resume upload 1", type=["pdf"], key="resume1")
+    up2 = st.file_uploader("Important Points To Remember", type=["pdf"], key="resume2")
+
     combined_resume = []
     if up1 is not None:
         txt1 = extract_pdf_text(up1.getvalue())
         if txt1:
             combined_resume.append("=== Resume 1 ===\n" + txt1)
+    if up2 is not None:
+        txt2 = extract_pdf_text(up2.getvalue())
+        if txt2:
+            combined_resume.append("=== Important Points to Remember ===\n" + txt2)
     if combined_resume:
         st.session_state.resume_text = "\n\n".join(combined_resume).strip()
 
