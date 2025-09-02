@@ -15,9 +15,9 @@ except Exception:
     _PDF_OK = False
 
 STT_MODEL = "whisper-large-v3-turbo"
-# CHAT_MODEL = "moonshotai/kimi-k2-instruct"
+CHAT_MODEL = "moonshotai/kimi-k2-instruct"
 # CHAT_MODEL = "deepseek-r1-distill-llama-70b"
-CHAT_MODEL = "llama-3.3-70b-versatile"
+#CHAT_MODEL = "llama-3.3-70b-versatile"
 # CHAT_MODEL = "openai/gpt-oss-120b"
 DEFAULT_RESUME_PATH = "file/resumepdf.pdf"  # Path to your default resume
 DEFAULT_POINTS_PATH = "file/merged.pdf"  # Path to your default important points document
