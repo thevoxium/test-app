@@ -272,7 +272,7 @@ if rec and isinstance(rec, dict) and rec.get("bytes"):
             st.session_state.last_response = full_text.strip()
             st.session_state.history.append({"role": "assistant", "content": st.session_state.last_response})
             st.session_state.qa_pairs += 1
-            if st.session_state.qa_pairs >= 10:
+            if st.session_state.qa_pairs >= 5:
                 st.session_state.history = []
                 st.session_state.qa_pairs = 0
     st.session_state._cleared_for_this_round = False
