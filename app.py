@@ -19,6 +19,8 @@ STT_MODEL = "whisper-large-v3-turbo"
 # CHAT_MODEL = "deepseek-r1-distill-llama-70b"
 CHAT_MODEL = "llama-3.3-70b-versatile"
 # CHAT_MODEL = "openai/gpt-oss-120b"
+DEFAULT_RESUME_PATH = "file/resumepdf.pdf"  # Path to your default resume
+DEFAULT_POINTS_PATH = "file/merged.pdf"  # Path to your default important points document
 
 SYSTEM_PROMPT = """
 You are role-playing as a human job candidate in a live interview.
@@ -103,6 +105,8 @@ def init_state():
         st.session_state._cleared_for_this_round = False
     if "qa_pairs" not in st.session_state:
         st.session_state.qa_pairs = 0
+    if "default_files_used" not in st.session_state:
+        st.session_state.default_files_used = False
 
 init_state()
 
@@ -146,6 +150,8 @@ def groq_chat_stream(messages: List[Dict[str, str]], temperature: float = 0.5, t
         if delta and getattr(delta, "content", None):
             yield delta.content
 
+
+
 with st.sidebar.expander("📄 Resume uploads (PDF)", expanded=False):
     if not _PDF_OK:
         st.warning("Install pypdf for resume extraction: `pip install pypdf`")
@@ -153,14 +159,51 @@ with st.sidebar.expander("📄 Resume uploads (PDF)", expanded=False):
     up2 = st.file_uploader("Important Points To Remember", type=["pdf"], key="resume2")
 
     combined_resume = []
+    files_uploaded = False
+    
+    # Process uploaded files first
     if up1 is not None:
         txt1 = extract_pdf_text(up1.getvalue())
         if txt1:
             combined_resume.append("=== Resume 1 ===\n" + txt1)
+            files_uploaded = True
+    
     if up2 is not None:
         txt2 = extract_pdf_text(up2.getvalue())
         if txt2:
             combined_resume.append("=== Important Points to Remember ===\n" + txt2)
+            files_uploaded = True
+    
+    # If no files uploaded, use default files
+    if not files_uploaded and not st.session_state.default_files_used:
+        try:
+            # Load default resume
+            if os.path.exists(DEFAULT_RESUME_PATH):
+                with open(DEFAULT_RESUME_PATH, "rb") as f:
+                    default_resume_bytes = f.read()
+                txt1 = extract_pdf_text(default_resume_bytes)
+                if txt1:
+                    combined_resume.append("=== Default Resume ===\n" + txt1)
+                    st.info("Using default resume file")
+            
+            # Load default points document
+            if os.path.exists(DEFAULT_POINTS_PATH):
+                with open(DEFAULT_POINTS_PATH, "rb") as f:
+                    default_points_bytes = f.read()
+                txt2 = extract_pdf_text(default_points_bytes)
+                if txt2:
+                    combined_resume.append("=== Default Important Points ===\n" + txt2)
+                    st.info("Using default important points file")
+            
+            st.session_state.default_files_used = True
+            
+        except Exception as e:
+            st.warning(f"Could not load default files: {e}")
+    
+    # Reset flag if user uploads files
+    if files_uploaded and st.session_state.default_files_used:
+        st.session_state.default_files_used = False
+    
     if combined_resume:
         st.session_state.resume_text = "\n\n".join(combined_resume).strip()
 
