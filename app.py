@@ -34,6 +34,7 @@ Ground your answers in the candidate's resume context provided to you.
 
 One more thing to remember-
 You are also provided a document along with resume which has many important points to remember while answering question, imformation like which chip, fpga, or microcontroller is used in which project is mentioned there. Please refer to that along with the resume to answer your questions.
+Important Point : if you are writing code in response, write comments in the code that clearly explain what that line of code does, please remember this, this is a very important point. 
 """
 
 st.set_page_config(page_title="", layout="centered")
