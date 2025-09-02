@@ -15,7 +15,10 @@ except Exception:
     _PDF_OK = False
 
 STT_MODEL = "whisper-large-v3-turbo"
-CHAT_MODEL = "moonshotai/kimi-k2-instruct"
+# CHAT_MODEL = "moonshotai/kimi-k2-instruct"
+# CHAT_MODEL = "deepseek-r1-distill-llama-70b"
+CHAT_MODEL = "llama-3.3-70b-versatile"
+# CHAT_MODEL = "openai/gpt-oss-120b"
 
 SYSTEM_PROMPT = """
 You are role-playing as a human job candidate in a live interview.
